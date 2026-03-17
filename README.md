@@ -50,10 +50,6 @@ CSV file (names) ──► AI generates name pairs ──► Code.py (Apps Scrip
 6. Click **Run** (▶)
 7. Grant permissions if prompted
 
-### First time? You'll need to authorise the script to access your Slides.
-
----
-
 ## Making Changes in the Future
 
 ### New CSV / Different Names
