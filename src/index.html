@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <base target="_top">
 
@@ -11,7 +12,8 @@
 </head>
 
 <body class="min-h-screen bg-slate-50">
-  <div class="max-w-2xl mx-auto px-6 py-12">
+
+  <div class="max-w-4xl mx-auto px-6 py-12">
 
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
 
@@ -21,43 +23,33 @@
         </h1>
 
         <p class="mt-2 text-slate-600">
-          Upload a CSV file and generate labels in Google Slides.
+          Upload a CSV file, map placeholders, and generate labels in Google Slides.
         </p>
       </div>
 
       <div class="space-y-6">
 
+        <!-- Slides URL -->
+
         <div>
-          <label
-            for="slideUrl"
-            class="block text-sm font-medium text-slate-700 mb-2"
-          >
-            Google Slides URL<span class="text-red-700">*</span>
+          <label for="slideUrl" class="block text-sm font-medium text-slate-700 mb-2">
+            Google Slides URL
+            <span class="text-red-600">*</span>
           </label>
 
-          <input
-            id="slideUrl"
-            type="url"
-            required
-            placeholder="https://docs.google.com/presentation/d/..."
-            class="w-full rounded-lg border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
+          <input id="slideUrl" type="url" placeholder="https://docs.google.com/presentation/d/..."
+            class="w-full rounded-lg border border-slate-300 px-4 py-3">
         </div>
 
+        <!-- CSV -->
+
         <div>
-          <label
-            for="csvFile"
-            class="block text-sm font-medium text-slate-700 mb-2"
-          >
-            CSV File<span class="text-red-700">*</span>
+          <label for="csvFile" class="block text-sm font-medium text-slate-700 mb-2">
+            CSV File
+            <span class="text-red-600">*</span>
           </label>
 
-          <input
-            id="csvFile"
-            type="file"
-            accept=".csv"
-            required
-            class="block w-full text-sm text-slate-600
+          <input id="csvFile" type="file" accept=".csv" class="block w-full text-sm text-slate-600
                    file:mr-4
                    file:rounded-lg
                    file:border-0
@@ -66,157 +58,563 @@
                    file:py-2
                    file:text-white
                    file:cursor-pointer
-                   hover:file:bg-blue-700"
-          >
+                   hover:file:bg-blue-700">
         </div>
 
-        <p class="mt-2 text-sm">
-          <a
-            href="data:text/csv;charset=utf-8,Contact%0AJohn%20Doe%0AJane%20Smith%0AMichael%20Tan%0ASarah%20Lee"
-            download="Template.csv"
-            class="text-blue-600 hover:underline"
-          >
-            Download Template.csv
-          </a>
-        </p>
+        <!-- Preset -->
+        <div id="presetContainer" class="hidden">
+          <label for="preset" class="block text-sm font-medium text-slate-700 mb-2">
+            Preset
+          </label>
 
-        <button
-          id="generateBtn"
-          onclick="generate()"
-          class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white hover:bg-blue-700 transition"
-        >
+          <select id="preset" onchange="applyPreset()" class="w-full rounded-lg border border-slate-300 px-4 py-3">
+            <option value="">Custom</option>
+            <option value="postcard">Postcard</option>
+            <option value="address">Address</option>
+          </select>
+        </div>
+
+        <!-- Records Per Slide -->
+
+        <div id="recordsContainer" class="hidden">
+          <label for="recordsPerSlide" class="block text-sm font-medium text-slate-700 mb-2">
+            Records Per Slide
+          </label>
+
+          <input id="recordsPerSlide" type="number" min="1" class="w-full rounded-lg border border-slate-300 px-4 py-3">
+
+          <p class="mt-2 text-sm text-slate-500">
+            Example: 2 = two labels per slide, 4 = four labels per slide.
+          </p>
+        </div>
+
+        <!-- Mapping Section -->
+
+        <div id="mappingSection" class="hidden border rounded-xl p-5 bg-slate-50">
+
+          <div class="flex items-center justify-between mb-4">
+
+            <h2 class="font-semibold text-lg">
+              Placeholder Mapping
+            </h2>
+
+            <button type="button" onclick="addMapping()"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              Add Mapping
+            </button>
+
+          </div>
+
+          <div class="grid grid-cols-12 gap-3 text-sm font-medium text-slate-600 mb-2">
+            <div class="col-span-5">
+              Placeholder
+            </div>
+
+            <div class="col-span-5">
+              CSV Column
+            </div>
+
+            <div class="col-span-2">
+            </div>
+          </div>
+
+          <div id="mappingRows" class="space-y-3"></div>
+
+        </div>
+
+        <!-- Generate -->
+
+        <button id="generateBtn" onclick="generate()"
+          class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white hover:bg-blue-700 transition">
           Generate Labels
         </button>
 
-        <div
-          id="status"
-          class="hidden rounded-lg border px-4 py-3 text-sm"
-        ></div>
+        <!-- Status -->
+
+        <div id="status" class="hidden rounded-lg border px-4 py-3 text-sm"></div>
 
       </div>
+
     </div>
+
   </div>
 
   <script>
-    function showStatus(message, type = 'info') {
-      const status = document.getElementById('status');
 
-      status.classList.remove(
-        'hidden',
-        'border-green-200',
-        'bg-green-50',
-        'text-green-700',
-        'border-red-200',
-        'bg-red-50',
-        'text-red-700',
-        'border-blue-200',
-        'bg-blue-50',
-        'text-blue-700'
-      );
+    let csvHeaders = [];
+
+    function showStatus(message, type = 'info') {
+
+      const status =
+        document.getElementById('status');
+
+      status.className =
+        'rounded-lg border px-4 py-3 text-sm';
 
       if (type === 'success') {
+
         status.classList.add(
           'border-green-200',
           'bg-green-50',
           'text-green-700'
         );
+
       } else if (type === 'error') {
+
         status.classList.add(
           'border-red-200',
           'bg-red-50',
           'text-red-700'
         );
+
       } else {
+
         status.classList.add(
           'border-blue-200',
           'bg-blue-50',
           'text-blue-700'
         );
+
       }
 
+      status.classList.remove('hidden');
       status.innerHTML = message;
     }
 
+    document
+      .getElementById('csvFile')
+      .addEventListener('change', parseCsvHeaders);
+
+    function parseCsvHeaders() {
+
+      const file =
+        document.getElementById('csvFile')
+          .files[0];
+
+      if (!file) return;
+
+      const reader = new FileReader();
+
+      reader.onload = function (event) {
+
+        const csvText =
+          event.target.result;
+
+        const lines =
+          csvText
+            .trim()
+            .split(/\r?\n/);
+
+        if (!lines.length) {
+
+          showStatus(
+            'CSV file is empty.',
+            'error'
+          );
+
+          return;
+        }
+
+        csvHeaders =
+          lines[0]
+            .split(',')
+            .map(h => h.trim());
+
+        document
+          .getElementById('mappingSection')
+          .classList.remove('hidden');
+
+        document
+          .getElementById('recordsContainer')
+          .classList.remove('hidden');
+
+        const presetContainer =
+          document.getElementById('presetContainer');
+
+        if (presetContainer) {
+          presetContainer.classList.remove('hidden');
+        }
+
+        document
+          .getElementById('mappingRows')
+          .innerHTML = '';
+
+        addMapping();
+
+      };
+
+      reader.readAsText(file);
+    }
+
+    function addMapping() {
+
+      if (!csvHeaders.length) {
+        return;
+      }
+
+      const container =
+        document.getElementById(
+          'mappingRows'
+        );
+
+      const row =
+        document.createElement('div');
+
+      row.className =
+        'grid grid-cols-12 gap-3 items-center';
+
+      const options =
+        csvHeaders
+          .map(
+            header =>
+              `<option value="${header}">
+            ${header}
+          </option>`
+          )
+          .join('');
+
+      row.innerHTML = `
+
+    <div class="col-span-5">
+      <input
+        type="text"
+        placeholder="{NAME_1}"
+        class="placeholderInput w-full rounded-lg border border-slate-300 px-3 py-2"
+      >
+    </div>
+
+    <div class="col-span-5">
+      <select
+        class="columnSelect w-full rounded-lg border border-slate-300 px-3 py-2"
+      >
+        ${options}
+      </select>
+    </div>
+
+    <div class="col-span-2">
+      <button
+        type="button"
+        onclick="removeMapping(this)"
+        class="w-full rounded-lg bg-red-600 px-3 py-2 text-white hover:bg-red-700"
+      >
+        Remove
+      </button>
+    </div>
+
+  `;
+
+      container.appendChild(row);
+    }
+
+    function addPresetMapping(
+      placeholder,
+      preferredColumn
+    ) {
+
+      const container =
+        document.getElementById(
+          'mappingRows'
+        );
+
+      const row =
+        document.createElement('div');
+
+      row.className =
+        'grid grid-cols-12 gap-3 items-center';
+
+      const options =
+        csvHeaders
+          .map(header => {
+
+            const selected =
+              header === preferredColumn
+                ? 'selected'
+                : '';
+
+            return `
+          <option value="${header}" ${selected}>
+            ${header}
+          </option>
+        `;
+
+          })
+          .join('');
+
+      row.innerHTML = `
+
+    <div class="col-span-5">
+      <input
+        type="text"
+        value="${placeholder}"
+        class="placeholderInput w-full rounded-lg border border-slate-300 px-3 py-2"
+      >
+    </div>
+
+    <div class="col-span-5">
+      <select
+        class="columnSelect w-full rounded-lg border border-slate-300 px-3 py-2"
+      >
+        ${options}
+      </select>
+    </div>
+
+    <div class="col-span-2">
+      <button
+        type="button"
+        onclick="removeMapping(this)"
+        class="w-full rounded-lg bg-red-600 px-3 py-2 text-white hover:bg-red-700"
+      >
+        Remove
+      </button>
+    </div>
+
+  `;
+
+      container.appendChild(row);
+    }
+
+    function applyPreset() {
+
+      const preset =
+        document.getElementById('preset')
+          .value;
+
+      const container =
+        document.getElementById(
+          'mappingRows'
+        );
+
+      container.innerHTML = '';
+
+      if (preset === 'postcard') {
+
+        document.getElementById(
+          'recordsPerSlide'
+        ).value = 2;
+
+        addPresetMapping(
+          '{NAME_1}',
+          'CONTACT'
+        );
+
+        addPresetMapping(
+          '{NAME_2}',
+          'CONTACT'
+        );
+
+      } else if (
+        preset === 'address'
+      ) {
+
+        document.getElementById(
+          'recordsPerSlide'
+        ).value = 1;
+
+        addPresetMapping(
+          '{COMPANY}',
+          'COMPANY'
+        );
+
+        addPresetMapping(
+          '{CONTACT}',
+          'CONTACT'
+        );
+
+        addPresetMapping(
+          '{ADDRESS}',
+          'ADDRESS'
+        );
+
+      } else {
+
+        addMapping();
+
+      }
+    }
+
+    function removeMapping(button) {
+
+      button
+        .closest('.grid')
+        .remove();
+    }
+
     function generate() {
+
       const slideUrl =
-        document.getElementById('slideUrl').value.trim();
+        document
+          .getElementById('slideUrl')
+          .value
+          .trim();
 
-      const fileInput =
-        document.getElementById('csvFile');
+      const file =
+        document
+          .getElementById('csvFile')
+          .files[0];
 
-      const button =
-        document.getElementById('generateBtn');
+      const recordsPerSlide =
+        Number(
+          document
+            .getElementById(
+              'recordsPerSlide'
+            )
+            .value
+        );
 
       if (!slideUrl) {
+
         showStatus(
           'Please enter a Google Slides URL.',
           'error'
         );
+
         return;
       }
 
-      if (!fileInput.files.length) {
+      if (!file) {
+
         showStatus(
-          'Please select a CSV file.',
+          'Please upload a CSV file.',
           'error'
         );
+
         return;
       }
 
+      const mappings = [];
+
+      document
+        .querySelectorAll(
+          '#mappingRows > div'
+        )
+        .forEach(row => {
+
+          const placeholder =
+            row
+              .querySelector(
+                '.placeholderInput'
+              )
+              .value
+              .trim();
+
+          const column =
+            row
+              .querySelector(
+                '.columnSelect'
+              )
+              .value;
+
+          if (placeholder) {
+
+            mappings.push({
+              placeholder,
+              column
+            });
+
+          }
+
+        });
+
+      if (!mappings.length) {
+
+        showStatus(
+          'Please add at least one mapping.',
+          'error'
+        );
+
+        return;
+      }
+
+      const button =
+        document.getElementById(
+          'generateBtn'
+        );
+
       button.disabled = true;
-      button.textContent = 'Generating...';
+      button.textContent =
+        'Generating...';
 
       showStatus(
-        'Uploading CSV and generating slides...',
+        'Generating slides...',
         'info'
       );
 
-      const reader = new FileReader();
+      const reader =
+        new FileReader();
 
-      reader.onload = function(e) {
-        const csvText = e.target.result;
+      reader.onload = function (event) {
+
+        const csvText =
+          event.target.result;
 
         google.script.run
-          .withSuccessHandler(function(result) {
-            button.disabled = false;
-            button.textContent = 'Generate Labels';
 
-            if (result.success) {
-              showStatus(
-                `
+          .withSuccessHandler(
+            function (result) {
+
+              button.disabled = false;
+              button.textContent =
+                'Generate Labels';
+
+              if (result.success) {
+
+                showStatus(
+                  `
                 Labels generated successfully.<br><br>
                 <a
                   href="${result.slideUrl}"
                   target="_blank"
-                  class="font-semibold underline"
+                  class="underline font-semibold"
                 >
                   Open Presentation
                 </a>
-                `,
-                'success'
-              );
-            } else {
+              `,
+                  'success'
+                );
+
+              } else {
+
+                showStatus(
+                  result.error,
+                  'error'
+                );
+
+              }
+
+            }
+          )
+
+          .withFailureHandler(
+            function (error) {
+
+              button.disabled = false;
+              button.textContent =
+                'Generate Labels';
+
               showStatus(
-                result.error,
+                error.message ||
+                'Unexpected error.',
                 'error'
               );
-            }
-          })
-          .withFailureHandler(function(error) {
-            button.disabled = false;
-            button.textContent = 'Generate Labels';
 
-            showStatus(
-              error.message || 'Unexpected error.',
-              'error'
-            );
-          })
-          .generateLabels(slideUrl, csvText);
+            }
+          )
+
+          .generateLabels(
+            slideUrl,
+            csvText,
+            mappings,
+            recordsPerSlide
+          );
+
       };
 
-      reader.readAsText(fileInput.files[0]);
+      reader.readAsText(file);
+
     }
+
   </script>
+
 </body>
+
 </html>
-```
